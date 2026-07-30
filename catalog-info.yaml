@@ -6,7 +6,7 @@ metadata:
   description: Ansible content from kdwyer-rd/stuff (hello_world, patching_linux, EDA rulebooks)
   annotations:
     github.com/project-slug: kdwyer-rd/stuff
-    backstage.io/source-location: url:https://github.com/kdwyer-rd/stuff/
+    backstage.io/source-location: url:https://github.com/kdwyer-rd/stuff/tree/main/
   tags:
     - ansible
     - aap
@@ -15,18 +15,9 @@ metadata:
     - url: https://github.com/kdwyer-rd/stuff
       title: GitHub Repository
       icon: github
+    - url: https://example-aap.apps.rosa.kpkuy-2yi3d-fvi.cspo.p3.openshiftapps.com/#/projects/12/details
+      title: AAP Project
 spec:
   type: service
   lifecycle: experimental
-  owner: user:default/admin
-  system: ansible-automation
----
-apiVersion: backstage.io/v1alpha1
-kind: Location
-metadata:
-  name: stuff-location
-  description: Catalog entry for kdwyer-rd/stuff
-spec:
-  type: url
-  targets:
-    - https://github.com/kdwyer-rd/stuff/blob/main/catalog-info.yaml
+  owner: group:default/rhdh-admin
