@@ -1,0 +1,28 @@
+---
+- name: Compose the welcome line
+  ansible.builtin.set_fact:
+    showcase_welcome_line: "{{ showcase_greeting }}, {{ showcase_audience }}!"
+
+- name: Announce via the packaged role
+  ansible.builtin.debug:
+    msg:
+      - "This output comes from role kdwyer.showcase.welcome"
+      - "FQCN keeps the role unique across projects and Galaxy installs"
+      - "{{ showcase_welcome_line }}"
+
+- name: Persist welcome line on the target (no become required)
+  when: showcase_write_file | bool
+  ansible.builtin.copy:
+    dest: "{{ showcase_output_path }}"
+    content: |
+      # written by kdwyer.showcase.welcome
+      host: {{ inventory_hostname }}
+      message: {{ showcase_welcome_line }}
+    mode: "0644"
+  notify: Showcase welcome written
+
+- name: Prove the role owns the procedure, playbook only supplies vars
+  ansible.builtin.debug:
+    msg: >-
+      Role finished on {{ inventory_hostname }}.
+      Playbooks should import this role instead of copying these tasks.

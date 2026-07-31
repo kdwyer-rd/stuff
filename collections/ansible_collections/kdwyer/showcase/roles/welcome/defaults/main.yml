@@ -1,0 +1,6 @@
+---
+# defaults for kdwyer.showcase.welcome
+showcase_greeting: "Welcome"
+showcase_audience: "world"
+showcase_write_file: true
+showcase_output_path: "/tmp/kdwyer-showcase-welcome.txt"

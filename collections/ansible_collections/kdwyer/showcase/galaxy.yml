@@ -1,0 +1,25 @@
+---
+namespace: kdwyer
+name: showcase
+version: 1.0.0
+readme: README.md
+authors:
+  - Karl Dwyer <kdwyer@redhat.com>
+description: >-
+  Sample collection that packages a reusable role to show why roles belong
+  in collections (FQCN, versioning, distribution) rather than loose playbook dirs.
+license:
+  - GPL-3.0-or-later
+tags:
+  - demo
+  - roles
+  - aap
+  - training
+dependencies: {}
+repository: https://github.com/kdwyer-rd/stuff
+documentation: https://github.com/kdwyer-rd/stuff/tree/main/collections/ansible_collections/kdwyer/showcase
+homepage: https://github.com/kdwyer-rd/stuff
+issues: https://github.com/kdwyer-rd/stuff/issues
+build_ignore:
+  - '*.tar.gz'
+  - .gitignore

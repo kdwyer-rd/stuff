@@ -1,0 +1,4 @@
+---
+- name: Showcase welcome written
+  ansible.builtin.debug:
+    msg: "Handler fired — welcome content changed on disk"

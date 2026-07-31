@@ -1,0 +1,29 @@
+---
+# Thin playbook: all reusable work lives in kdwyer.showcase.welcome
+#
+# Survey / extra vars:
+#   showcase_greeting
+#   showcase_audience
+#
+#   ansible-playbook use_showcase_role.yml \
+#     -e showcase_greeting=Hello -e showcase_audience=AAP
+
+- name: Use a role packaged inside a collection
+  hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    showcase_greeting: "{{ showcase_greeting | default('Welcome') }}"
+    showcase_audience: "{{ showcase_audience | default('collection roles') }}"
+    showcase_write_file: true
+
+  tasks:
+    - name: Highlight that we call the role by FQCN
+      ansible.builtin.debug:
+        msg: >-
+          Importing kdwyer.showcase.welcome — the role is versioned with the
+          collection, not copied into this playbook.
+
+    - name: Import the collection role
+      ansible.builtin.import_role:
+        name: kdwyer.showcase.welcome
