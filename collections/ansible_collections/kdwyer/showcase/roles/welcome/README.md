@@ -20,5 +20,5 @@ Reusable welcome role **shipped inside** the `kdwyer.showcase` collection.
 
 ## Teaching point
 
-Consumers depend on **`kdwyer.showcase`**, not a random `roles/welcome` folder.
+System depend on **`kdwyer.showcase`**, not a random `roles/welcome` folder.
 That is how you share, version, and avoid role-name collisions in AAP.
