@@ -16,7 +16,7 @@ metadata:
     - url: https://github.com/kdwyer-rd/stuff
       title: GitHub Repository
       icon: github
-    - url: https://example-aap.apps.rosa.kpkuy-2yi3d-fvi.cspo.p3.openshiftapps.com/#/projects/12/details
+    - url: https://example-aap.apps.rosa.hwavu-p5uzm-upm.qyl8.p3.openshiftapps.com/#/projects/8/details
       title: AAP Project
 spec:
   type: service

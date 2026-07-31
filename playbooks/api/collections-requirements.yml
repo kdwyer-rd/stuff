@@ -1,0 +1,13 @@
+---
+# Install locally (or into an EE), not via AAP project sync.
+# ansible.controller is published on Automation Hub, not public Galaxy.
+#
+#   ansible-galaxy collection install -r collections-requirements.yml \
+#     --server https://console.redhat.com/api/automation-hub/content/published/ \
+#     --token <RH_CDN_TOKEN>
+#
+collections:
+  - name: ansible.controller
+    version: ">=4.5.0"
+  - name: ansible.utils
+    version: ">=2.0.0"

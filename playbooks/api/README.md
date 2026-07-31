@@ -16,7 +16,7 @@
 # cd playbooks/api
 # cp vars.example.yml vars.yml   # edit aap_host + token or user/password
 # # optional, for launch_job_controller.yml:
-# ansible-galaxy collection install -r ../../collections/requirements.yml
+# ansible-galaxy collection install -r collections-requirements.yml
 # ```
 #
 # Create an AAP token: Access Management → Users → (you) → Tokens
