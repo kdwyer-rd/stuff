@@ -1,0 +1,59 @@
+---
+# Restart (or otherwise manage) a systemd service chosen via JT survey.
+#
+# Survey / extra vars:
+#   service_name  - unit name without .service (e.g. sshd, chronyd)
+#   service_state - started | stopped | restarted | reloaded
+#
+# Example:
+#   ansible-playbook -i inventory restart_service.yml \
+#     -e service_name=chronyd -e service_state=restarted
+
+- name: Manage a surveyed systemd service
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    service_name: "{{ service_name | default('chronyd') }}"
+    service_state: "{{ service_state | default('restarted') }}"
+
+  tasks:
+    - name: Validate survey inputs
+      ansible.builtin.assert:
+        that:
+          - service_name is string
+          - service_name | length > 0
+          - service_name is match('^[a-zA-Z0-9@._\\-]+$')
+          - service_state in ['started', 'stopped', 'restarted', 'reloaded']
+        fail_msg: >-
+          Invalid survey input: service_name='{{ service_name }}'
+          service_state='{{ service_state }}'
+
+    - name: Show planned change
+      ansible.builtin.debug:
+        msg: >-
+          On {{ inventory_hostname }} set {{ service_name }}.service
+          to state={{ service_state }}
+
+    - name: Apply systemd service state
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: "{{ service_state }}"
+        daemon_reload: false
+      register: service_result
+
+    - name: Report service status after change
+      ansible.builtin.command:
+        cmd: "systemctl is-active {{ service_name }}"
+      register: active_state
+      changed_when: false
+      failed_when: false
+
+    - name: Service result summary
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          service: "{{ service_name }}"
+          requested_state: "{{ service_state }}"
+          changed: "{{ service_result.changed }}"
+          active: "{{ active_state.stdout | default('unknown') }}"
