@@ -6,6 +6,7 @@ Sample Ansible content for AAP / Automation Portal demos.
 |------|---------|
 | `hello_world.yml` | Minimal debug play |
 | `restart_service.yml` | Survey-driven systemd service restart |
+| `survey_hello.yml` | Survey hello demo (no become; safe on localhost) |
 | `patching_linux.yml` | Role-based patching sample |
 | `playbooks/api/` | **Showcase: call the Controller API to list/launch plays** |
 | `rulebooks/` | EDA rulebook samples |

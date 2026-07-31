@@ -1,0 +1,60 @@
+---
+# Harmless survey demo — no become, safe on Demo Inventory localhost.
+#
+# Survey / extra vars:
+#   user_name     - who to greet
+#   user_message  - free-text message
+#   repeat_count  - how many times to print (1-5)
+
+- name: Surveyable hello (no privilege escalation)
+  hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    user_name: "{{ user_name | default('world') }}"
+    user_message: "{{ user_message | default('Hello from AAP') }}"
+    repeat_count: "{{ repeat_count | default(1) | int }}"
+
+  tasks:
+    - name: Validate survey inputs
+      ansible.builtin.assert:
+        that:
+          - user_name is string
+          - user_name | length > 0
+          - user_message is string
+          - user_message | length > 0
+          - repeat_count | int >= 1
+          - repeat_count | int <= 5
+        fail_msg: "Bad survey input — check user_name, user_message, repeat_count (1-5)."
+
+    - name: Build greeting lines
+      ansible.builtin.set_fact:
+        greetings: >-
+          {{
+            range(1, (repeat_count | int) + 1)
+            | map('regex_replace', '^(.*)$',
+                  user_message ~ ', ' ~ user_name ~ '! (#' ~ '\1' ~ ')')
+            | list
+          }}
+
+    - name: Show greetings
+      ansible.builtin.debug:
+        msg: "{{ item }}"
+      loop: "{{ greetings }}"
+
+    - name: Write greetings to a temp file on the host
+      ansible.builtin.copy:
+        dest: "/tmp/aap-survey-hello-{{ inventory_hostname }}.txt"
+        content: |
+          host: {{ inventory_hostname }}
+          {% for line in greetings %}
+          {{ line }}
+          {% endfor %}
+        mode: "0644"
+      register: outfile
+
+    - name: Confirm success
+      ansible.builtin.debug:
+        msg: >-
+          Wrote {{ greetings | length }} line(s) to {{ outfile.dest }}
+          on {{ inventory_hostname }}
