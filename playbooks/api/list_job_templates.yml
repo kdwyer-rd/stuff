@@ -1,0 +1,66 @@
+---
+# Showcase: list Controller resources with the REST API (ansible.builtin.uri).
+#
+#   ansible-playbook -i inventory list_job_templates.yml \
+#     -e @vars.yml
+#
+# Works against AAP 2.4+ gateway / Controller at /api/controller/v2/.
+
+- name: List job templates via Ansible Controller API
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/vars.example.yml"
+  vars:
+    controller_api: "{{ aap_host | regex_replace('/$', '') }}/api/controller/v2"
+    aap_use_token: "{{ (aap_token | default('') | length) > 0 }}"
+    aap_auth_header: "{{ {'Authorization': 'Bearer ' ~ aap_token} if (aap_token | default('') | length) > 0 else {} }}"
+
+  tasks:
+    - name: Require AAP connection settings
+      ansible.builtin.assert:
+        that:
+          - aap_host is defined
+          - aap_host | length > 0
+          - (aap_token | default('') | length > 0) or
+            ((aap_username | default('') | length > 0) and (aap_password | default('') | length > 0))
+        fail_msg: >-
+          Set aap_host and either aap_token or aap_username/aap_password
+          (see vars.example.yml).
+
+    - name: GET /api/controller/v2/me/ (who am I)
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/me/"
+        method: GET
+        headers: "{{ aap_auth_header }}"
+        url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+        url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+        force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+        validate_certs: "{{ aap_validate_certs | default(true) }}"
+        status_code: [200]
+      register: me
+
+    - name: Show authenticated user
+      ansible.builtin.debug:
+        msg: "Authenticated as {{ me.json.results[0].username }} (id={{ me.json.results[0].id }})"
+
+    - name: GET /api/controller/v2/job_templates/
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/job_templates/?page_size=100&order_by=name"
+        method: GET
+        headers: "{{ aap_auth_header }}"
+        url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+        url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+        force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+        validate_certs: "{{ aap_validate_certs | default(true) }}"
+        status_code: [200]
+      register: jts
+
+    - name: Summarize job templates visible to this credential
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.id }} | {{ item.name }} | playbook={{ item.playbook }}
+          | inventory={{ item.summary_fields.inventory.name | default('n/a') }}
+      loop: "{{ jts.json.results }}"
+      loop_control:
+        label: "{{ item.name }}"

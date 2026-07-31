@@ -1,0 +1,19 @@
+---
+# Copy to vars.yml (do not commit secrets) or pass with -e / AAP survey.
+aap_host: "https://example-aap.apps.rosa.kpkuy-2yi3d-fvi.cspo.p3.openshiftapps.com"
+aap_validate_certs: true
+
+# Prefer a personal access / OAuth2 token in production.
+aap_token: ""
+
+# Used only when aap_token is empty.
+aap_username: "admin"
+aap_password: ""
+
+# Target play to launch via the Controller API
+job_template_name: "stuff-hello_world"
+# Optional override; when empty the playbook looks up the JT by name.
+job_template_id: ""
+
+# Extra variables forwarded into the launched job (must match JT survey/vars).
+job_extra_vars: {}

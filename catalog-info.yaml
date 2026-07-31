@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: stuff
   title: stuff
-  description: Ansible content from kdwyer-rd/stuff (hello_world, patching_linux, EDA rulebooks)
+  description: Ansible content from kdwyer-rd/stuff (hello_world, patching_linux, Controller API demos, EDA rulebooks)
   annotations:
     github.com/project-slug: kdwyer-rd/stuff
     backstage.io/source-location: url:https://github.com/kdwyer-rd/stuff/tree/main/
@@ -11,6 +11,7 @@ metadata:
     - ansible
     - aap
     - playbooks
+    - api
   links:
     - url: https://github.com/kdwyer-rd/stuff
       title: GitHub Repository

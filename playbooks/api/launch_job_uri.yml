@@ -1,0 +1,136 @@
+---
+# Showcase: launch a job template and poll until it finishes (REST / uri).
+#
+#   ansible-playbook -i inventory launch_job_uri.yml \
+#     -e @vars.yml \
+#     -e job_template_name=stuff-hello_world
+#
+# API flow:
+#   1. GET  /job_templates/?name=...     -> resolve id
+#   2. POST /job_templates/{id}/launch/  -> start job
+#   3. GET  /jobs/{id}/                 -> poll status
+#   4. GET  /jobs/{id}/stdout/?format=txt
+
+- name: Launch a job template via Controller REST API
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/vars.example.yml"
+  vars:
+    controller_api: "{{ aap_host | regex_replace('/$', '') }}/api/controller/v2"
+    aap_use_token: "{{ (aap_token | default('') | length) > 0 }}"
+    aap_auth_header: "{{ {'Authorization': 'Bearer ' ~ aap_token} if (aap_token | default('') | length) > 0 else {} }}"
+    poll_retries: 60
+    poll_delay: 5
+
+  tasks:
+    - name: Require AAP connection and target JT
+      ansible.builtin.assert:
+        that:
+          - aap_host is defined
+          - (aap_token | default('') | length > 0) or
+            ((aap_username | default('') | length > 0) and (aap_password | default('') | length > 0))
+          - (job_template_id | default('') | string | length > 0) or
+            (job_template_name | default('') | length > 0)
+        fail_msg: >-
+          Need aap_host + credentials, and job_template_id or job_template_name.
+
+    - name: Look up job template by name
+      when: (job_template_id | default('') | string | length) == 0
+      ansible.builtin.uri:
+        url: >-
+          {{ controller_api }}/job_templates/?name={{ job_template_name | urlencode }}
+        method: GET
+        headers: "{{ aap_auth_header }}"
+        url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+        url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+        force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+        validate_certs: "{{ aap_validate_certs | default(true) }}"
+        status_code: [200]
+      register: jt_lookup
+
+    - name: Resolve job template id
+      ansible.builtin.set_fact:
+        resolved_jt_id: >-
+          {{
+            job_template_id
+            if (job_template_id | default('') | string | length) > 0
+            else jt_lookup.json.results[0].id
+          }}
+        resolved_jt_name: >-
+          {{
+            job_template_name
+            if (job_template_name | default('') | length) > 0
+            else (jt_lookup.json.results[0].name | default('id=' ~ job_template_id))
+          }}
+
+    - name: Fail if job template was not found
+      when: (job_template_id | default('') | string | length) == 0
+      ansible.builtin.assert:
+        that:
+          - jt_lookup.json.count | int >= 1
+        fail_msg: "No job template named '{{ job_template_name }}'"
+
+    - name: POST /job_templates/{{ resolved_jt_id }}/launch/
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/job_templates/{{ resolved_jt_id }}/launch/"
+        method: POST
+        headers: "{{ aap_auth_header | combine({'Content-Type': 'application/json'}) }}"
+        url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+        url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+        force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+        validate_certs: "{{ aap_validate_certs | default(true) }}"
+        body_format: json
+        body:
+          extra_vars: "{{ job_extra_vars | default({}) }}"
+        status_code: [201]
+      register: launch
+
+    - name: Show launched job
+      ansible.builtin.debug:
+        msg: >-
+          Launched JT '{{ resolved_jt_name }}' as job id={{ launch.json.id }}
+          status={{ launch.json.status }}
+          url={{ aap_host }}/#/jobs/playbook/{{ launch.json.id }}/details
+
+    - name: Poll GET /jobs/{{ launch.json.id }}/ until finished
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/jobs/{{ launch.json.id }}/"
+        method: GET
+        headers: "{{ aap_auth_header }}"
+        url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+        url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+        force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+        validate_certs: "{{ aap_validate_certs | default(true) }}"
+        status_code: [200]
+      register: job
+      until: job.json.finished is not none
+      retries: "{{ poll_retries }}"
+      delay: "{{ poll_delay }}"
+
+    - name: GET job stdout (text)
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/jobs/{{ launch.json.id }}/stdout/?format=txt"
+        method: GET
+        headers: "{{ aap_auth_header }}"
+        url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+        url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+        force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+        validate_certs: "{{ aap_validate_certs | default(true) }}"
+        return_content: true
+        status_code: [200]
+      register: stdout
+
+    - name: Report final status
+      ansible.builtin.debug:
+        msg:
+          job_id: "{{ launch.json.id }}"
+          status: "{{ job.json.status }}"
+          failed: "{{ job.json.failed }}"
+          elapsed: "{{ job.json.elapsed }}"
+          stdout_preview: "{{ stdout.content | default('') | truncate(800, true, '...') }}"
+
+    - name: Fail the outer play if the launched job failed
+      when: job.json.failed | bool or job.json.status not in ['successful']
+      ansible.builtin.fail:
+        msg: "Launched job {{ launch.json.id }} ended with status={{ job.json.status }}"

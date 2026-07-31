@@ -1,0 +1,102 @@
+---
+# Showcase: ad-hoc "run this playbook now" via the /ad_hoc_commands/ API.
+# Useful when you want API-driven one-shots without a pre-created job template.
+#
+#   ansible-playbook -i inventory launch_adhoc_uri.yml -e @vars.yml \
+#     -e inventory_name=RFE-test-inventory \
+#     -e credential_name=RFE-test-machine \
+#     -e 'adhoc_module=ping'
+#
+# Note: ad-hoc runs a module, not a full playbook YAML. For full playbooks,
+# use launch_job_uri.yml / launch_job_controller.yml against a job template.
+
+- name: Run an ad-hoc module via Controller REST API
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/vars.example.yml"
+  vars:
+    controller_api: "{{ aap_host | regex_replace('/$', '') }}/api/controller/v2"
+    aap_use_token: "{{ (aap_token | default('') | length) > 0 }}"
+    aap_auth_header: "{{ {'Authorization': 'Bearer ' ~ aap_token} if (aap_token | default('') | length) > 0 else {} }}"
+    inventory_name: "RFE-test-inventory"
+    credential_name: "RFE-test-machine"
+    adhoc_module: ping
+    adhoc_module_args: ""
+    adhoc_limit: ""
+    poll_retries: 30
+    poll_delay: 3
+
+  module_defaults:
+    ansible.builtin.uri:
+      headers: "{{ aap_auth_header }}"
+      url_username: "{{ omit if (aap_use_token | bool) else aap_username }}"
+      url_password: "{{ omit if (aap_use_token | bool) else aap_password }}"
+      force_basic_auth: "{{ omit if (aap_use_token | bool) else true }}"
+      validate_certs: "{{ aap_validate_certs | default(true) }}"
+
+  tasks:
+    - name: Require inputs
+      ansible.builtin.assert:
+        that:
+          - aap_host is defined
+          - (aap_token | default('') | length > 0) or
+            ((aap_username | default('') | length > 0) and (aap_password | default('') | length > 0))
+          - inventory_name | length > 0
+          - credential_name | length > 0
+
+    - name: Resolve inventory id
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/inventories/?name={{ inventory_name | urlencode }}"
+        method: GET
+        status_code: [200]
+      register: inv
+
+    - name: Resolve credential id
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/credentials/?name={{ credential_name | urlencode }}"
+        method: GET
+        status_code: [200]
+      register: cred
+
+    - name: Assert inventory and credential exist
+      ansible.builtin.assert:
+        that:
+          - inv.json.count | int >= 1
+          - cred.json.count | int >= 1
+        fail_msg: >-
+          Could not find inventory='{{ inventory_name }}' or
+          credential='{{ credential_name }}'.
+
+    - name: POST /ad_hoc_commands/
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/ad_hoc_commands/"
+        method: POST
+        headers: "{{ aap_auth_header | combine({'Content-Type': 'application/json'}) }}"
+        body_format: json
+        body:
+          inventory: "{{ inv.json.results[0].id }}"
+          credential: "{{ cred.json.results[0].id }}"
+          module_name: "{{ adhoc_module }}"
+          module_args: "{{ adhoc_module_args }}"
+          limit: "{{ adhoc_limit }}"
+        status_code: [201]
+      register: adhoc
+
+    - name: Poll ad-hoc command
+      ansible.builtin.uri:
+        url: "{{ controller_api }}/ad_hoc_commands/{{ adhoc.json.id }}/"
+        method: GET
+        status_code: [200]
+      register: adhoc_job
+      until: adhoc_job.json.finished is not none
+      retries: "{{ poll_retries }}"
+      delay: "{{ poll_delay }}"
+
+    - name: Ad-hoc result
+      ansible.builtin.debug:
+        msg:
+          id: "{{ adhoc.json.id }}"
+          status: "{{ adhoc_job.json.status }}"
+          module: "{{ adhoc_module }}"
+          url: "{{ aap_host }}/#/jobs/command/{{ adhoc.json.id }}/details"

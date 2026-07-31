@@ -1,0 +1,68 @@
+---
+# Showcase: same launch/wait flow using ansible.controller collection modules.
+#
+# Requires: ansible-galaxy collection install -r collections/requirements.yml
+#
+#   ansible-playbook -i inventory launch_job_controller.yml \
+#     -e @vars.yml \
+#     -e job_template_name=stuff-hello_world
+#
+# Prefer this style in production playbooks; uri demos the raw HTTP contract.
+
+- name: Launch a job template via ansible.controller
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/vars.example.yml"
+  vars:
+    # Collection modules accept controller_* connection knobs
+    controller_host: "{{ aap_host }}"
+    controller_username: "{{ aap_username | default(omit) }}"
+    controller_password: "{{ aap_password | default(omit) }}"
+    controller_oauthtoken: "{{ aap_token if (aap_token | default('') | length) > 0 else omit }}"
+    controller_verify_ssl: "{{ aap_validate_certs | default(true) }}"
+
+  tasks:
+    - name: Require AAP connection and target JT
+      ansible.builtin.assert:
+        that:
+          - aap_host is defined
+          - (aap_token | default('') | length > 0) or
+            ((aap_username | default('') | length > 0) and (aap_password | default('') | length > 0))
+          - job_template_name | default('') | length > 0
+        fail_msg: >-
+          Need aap_host + credentials and job_template_name.
+
+    - name: Launch job template
+      ansible.controller.job_launch:
+        job_template: "{{ job_template_name }}"
+        extra_vars: "{{ job_extra_vars | default({}) }}"
+        controller_host: "{{ controller_host }}"
+        controller_username: "{{ controller_username | default(omit) }}"
+        controller_password: "{{ controller_password | default(omit) }}"
+        controller_oauthtoken: "{{ controller_oauthtoken | default(omit) }}"
+        validate_certs: "{{ controller_verify_ssl }}"
+      register: launched
+
+    - name: Show launch result
+      ansible.builtin.debug:
+        var: launched
+
+    - name: Wait for job to finish
+      ansible.controller.job_wait:
+        job_id: "{{ launched.id }}"
+        controller_host: "{{ controller_host }}"
+        controller_username: "{{ controller_username | default(omit) }}"
+        controller_password: "{{ controller_password | default(omit) }}"
+        controller_oauthtoken: "{{ controller_oauthtoken | default(omit) }}"
+        validate_certs: "{{ controller_verify_ssl }}"
+        timeout: 600
+      register: waited
+
+    - name: Final job status
+      ansible.builtin.debug:
+        msg:
+          job_id: "{{ launched.id }}"
+          status: "{{ waited.status }}"
+          elapsed: "{{ waited.elapsed | default('n/a') }}"
+          url: "{{ aap_host }}/#/jobs/playbook/{{ launched.id }}/details"
