@@ -1,0 +1,7 @@
+---
+- name: Say what
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - ansible.builtin.debug:
+        msg: "Received webhook event: Ansible is super cool!"

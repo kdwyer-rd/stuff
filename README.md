@@ -11,7 +11,9 @@ Sample Ansible content for AAP / Automation Portal demos.
 | `playbooks/api/` | **Showcase: call the Controller API to list/launch plays** |
 | `collections/ansible_collections/kdwyer/showcase/` | Sample collection + `welcome` role (FQCN demo) |
 | `use_showcase_role.yml` | Thin playbook that imports `kdwyer.showcase.welcome` |
-| `rulebooks/` | EDA rulebook samples |
+| `extensions/eda/rulebooks/` | EDA rulebooks (AAP 2.7 standard path) |
+| `say-what.yml` | Playbook invoked by the webhook rulebook demo |
+| `rulebooks/` | Legacy EDA rulebook path (deprecated; use `extensions/eda/rulebooks/`) |
 | `catalog-info.yaml` | Backstage / Automation Portal catalog entity |
 
 See [`playbooks/api/README.md`](playbooks/api/README.md) for API demo usage.
