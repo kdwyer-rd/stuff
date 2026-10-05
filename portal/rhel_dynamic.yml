@@ -1,0 +1,203 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: rhel-update-time-servers-dynamic
+  title: ⏰ Manage RHEL Time Servers
+  description: >-
+    Easily update and manage time server settings across your Red Hat Enterprise
+    Linux systems using this guided form.
+  namespace: default
+  tags:
+    - operations
+    - intermediate
+    - rhel
+spec:
+  type: service
+  presentation:
+    buttonLabels:
+      backButtonText: 'Return'
+      createButtonText: 'Update'
+      reviewButtonText: 'Verify'
+  parameters:
+    - title: Access & Time server settings
+      required:
+        - inventory
+        - credentials
+        - ntpServers
+        - serviceRestartConfirmation
+      properties:
+        token:
+          title: 🔑 Access Token
+          type: string
+          description: |
+            Enter your access token for secure authentication.
+          ui:field: AAPTokenField
+          ui:widget: hidden
+          ui:backstage:
+            review:
+              show: false
+        inventory:
+          title: 🗂️ Server Group
+          description: |
+            Choose the group of servers you want to update. This will apply your settings to all selected servers.
+          resource: inventories
+          ui:field: AAPResourcePicker
+        credentials:
+          title: 🔐 Login Credentials
+          description: |
+            Select the credentials needed to connect to your servers.
+            Only one credential per type is allowed.
+            If you need to enter credentials at the time of update, select "Prompt on launch".
+          type: array
+          ui:field: AAPResourcePicker
+          resource: credentials
+        ntpServers:
+          title: 🌐 NTP Servers
+          type: string
+          description: |
+            Enter a comma-separated list of time servers, for example:
+            0.rhel.pool.ntp.org, 1.rhel.pool.ntp.org
+            Using more than one server improves reliability.
+          default: 0.rhel.pool.ntp.org, 1.rhel.pool.ntp.org
+          ui:options:
+            rows: 3
+          pattern: '^([a-zA-Z0-9.\-]+)(,\s*[a-zA-Z0-9.\-]+)*$'
+          errorMessage:
+            pattern: 'Please enter a valid, comma-separated list of time servers.'
+        timezone:
+          title: 🌍 Timezone
+          type: string
+          description: |
+            Set the timezone for your servers, for example: UTC or America/New_York.
+            You can find a full list of timezones online.
+          default: UTC
+        showAdvanced:
+          title: ⚙️ Show Advanced Options?
+          description: |
+            Enable this option to configure additional time sync settings.
+          type: boolean
+          default: false
+        serviceRestartConfirmation:
+          title: 🔄 Restart Time Service?
+          description: |
+            Restart the time service to apply your new settings?
+          type: string
+          default: 'Yes'
+          enum:
+            - 'Yes'
+            - 'No'
+      dependencies:
+        showAdvanced:
+          oneOf:
+            - properties:
+                showAdvanced:
+                  const: true
+                maxSyncDelay:
+                  type: number
+                  title: ⏱️ Max Allowed Sync Delay (ms)
+                  description: |
+                    Set the maximum allowed time sync delay in milliseconds.
+                    The recommended value is 500 ms or less.
+                  default: 500
+                  minimum: 100
+                  maximum: 5000
+                  errorMessage:
+                    minimum: 'Delay must be at least 100 ms.'
+                    maximum: 'Delay cannot exceed 5000 ms.'
+                minPeers:
+                  type: number
+                  title: 👥 Minimum NTP Peers
+                  description: |
+                    Minimum number of NTP servers that must be reachable.
+                  default: 2
+                  minimum: 1
+                  maximum: 10
+                  errorMessage:
+                    minimum: 'At least one peer is required.'
+                    maximum: 'No more than 10 peers allowed.'
+                transactionalUpdateRebootOk:
+                  type: boolean
+                  title: 🔄 Allow Reboot for Transactional Updates?
+                  description: |
+                    If using an ostree-based system (like Silverblue), allow an automatic reboot if required by the update.
+                  default: false
+            - properties:
+                showAdvanced:
+                  const: false
+        serviceRestartConfirmation:
+          oneOf:
+            - properties:
+                serviceRestartConfirmation:
+                  const: 'Yes'
+                restartReason:
+                  type: string
+                  title: 📝 Reason for Restart
+                  description: |
+                    Please provide a reason for restarting the time service. This is used for audit purposes.
+                  default: "Applying new time server configuration."
+                  minLength: 10
+                  errorMessage:
+                    minLength: 'Please provide a more detailed reason (at least 10 characters).'
+            - properties:
+                serviceRestartConfirmation:
+                  const: 'No'
+    - title: Review & Confirm
+      properties:
+        review:
+          type: string
+          title: 📝 Review Your Choices
+          description: |
+            Please review your selections before continuing.
+            After you click Update, your settings will be applied to all servers in the selected group.
+          default: "If everything looks correct, click Update to start the process."
+  steps:
+    - id: review
+      name: Review Selections
+      action: debug:log
+      input:
+        message: |
+          Review
+          Server Group: ${{ parameters.inventory }}
+          Credentials: ${{ parameters.credentials }}
+          NTP Servers: ${{ parameters.ntpServers }}
+          Timezone: ${{ parameters.timezone }}
+          Advanced Options: ${{ parameters.showAdvanced ? 'Enabled' : 'Disabled' }}
+          ${{ parameters.showAdvanced ? 'Max Sync Delay: ' + parameters.maxSyncDelay + ' ms' : '' }}
+          ${{ parameters.showAdvanced ? 'Min NTP Peers: ' + parameters.minPeers : '' }}
+          ${{ parameters.showAdvanced ? 'Allow Reboot for Transactional Updates: ' + parameters.transactionalUpdateRebootOk : '' }}
+          Restart Time Service: ${{ parameters.serviceRestartConfirmation }}
+          ${{ parameters.serviceRestartConfirmation === 'Yes' ? 'Restart Reason: ' + parameters.restartReason : '' }}
+
+    - id: launch-job
+      name: Update Time Servers
+      action: rhaap:launch-job-template
+      input:
+        token: ${{ secrets.aapToken }}
+        values:
+          template: RHEL / Update RHEL Time Servers
+          inventory: ${{ parameters.inventory }}
+          credentials: ${{ parameters.credentials }}
+          extraVariables:
+            user_ntp_servers: ${{ parameters.ntpServers }}
+            user_timezone: ${{ parameters.timezone }}
+            restart_chronyd_service: ${{ parameters.serviceRestartConfirmation }}
+            restart_reason: ${{ parameters.restartReason }}
+            max_sync_delay: ${{ parameters.maxSyncDelay }}
+            apply_to_all: 'Yes'
+            min_peers: ${{ parameters.minPeers }}
+            user_timesync_transactional_update_reboot_ok: ${{ parameters.transactionalUpdateRebootOk }}
+
+  output:
+    text:
+      - title: Time Server Update Complete!
+        content: |
+          **Job ID:** ${{ steps['launch-job'].output.data.id }}
+          **Status:** ${{ steps['launch-job'].output.data.status }}
+
+          [View Details](${{ steps['launch-job'].output.data.url }})
+
+          ---
+          Thank you for managing your RHEL time servers with this form!
+    links:
+      - title: RHEL Time Management Guide
+        url: https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_basic_system_settings/assembly_changing-basic-environment-settings_configuring-basic-system-settings
